@@ -10,7 +10,7 @@ A PowerShell toolkit for rapid Windows incident-response triage and Defender har
 
 | Script | Purpose |
 |--------|---------|
-| `current_status.ps1` | **Triage collector:** snapshots host state (processes, services, network, accounts, persistence, security events) to timestamped CSVs. |
+| `current_status.ps1` | **Triage collector:** snapshots host state (processes, services, network, accounts, persistence, security events). |
 | `defender_checker.ps1` | **Hardening + tamper remediation:** re-enables Defender and the firewall, restores tampered policy registry keys, and logs every change to a transcript. |
 
 ---
