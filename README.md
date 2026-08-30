@@ -17,7 +17,7 @@ A PowerShell toolkit for rapid Windows incident-response triage and Defender har
 
 ## `current_status.ps1:` Triage Collector
 
-Captures a point-in-time snapshot of the system and exports each artifact class to its own CSV in a timestamped folder (`triage-<yyyyMMdd-HHmmss>/`). CSV output is deliberate: nothing is truncated by the console formatter, and the results are parseable downstream (Excel, a SIEM, or `Import-Csv`).
+Captures a point-in-time snapshot of the system and writes it to a single, sectioned report in a timestamped file (`status-<yyyyMMdd-HHmmss>/`). 
 
 **Collected artifacts:**
 
