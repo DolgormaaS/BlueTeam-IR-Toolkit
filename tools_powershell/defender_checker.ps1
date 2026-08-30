@@ -1,71 +1,74 @@
-# Run as Administrator
+#Requires -RunAsAdministrator
 
-Write-Host "[+] Checking initial Defender status..."
-Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, IsTamperProtected, AMRunningMode, AntivirusSignatureLastUpdated
+<#
+.SYNOPSIS
+    Defender / firewall hardening + policy-tamper remediation.
+    Mutates security state, so every run is captured to a transcript.
+#>
 
-Write-Host "`n[+] Enabling Windows Firewall profiles..."
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$log = Join-Path (Get-Location) "defender-remediation-$timestamp.log"
+Start-Transcript -Path $log | Out-Null
+
+Write-Host "[+] Initial Defender status..."
+Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled,
+    IsTamperProtected, AMRunningMode, AntivirusSignatureLastUpdated
+
+Write-Host "`n[+] Enabling firewall profiles..."
 Set-NetFirewallProfile -Profile Domain, Private, Public -Enabled True
 
-Write-Host "`n[+] Checking whether this is Windows Server with Install-WindowsFeature..."
+Write-Host "`n[+] Checking for Windows Server (Install-WindowsFeature)..."
 if (Get-Command Install-WindowsFeature -ErrorAction SilentlyContinue) {
-    $defenderFeature = Get-WindowsFeature -Name Windows-Defender -ErrorAction SilentlyContinue
-
-    if ($defenderFeature -and -not $defenderFeature.Installed) {
-        Write-Host "[+] Installing Windows Defender feature..."
-        Install-WindowsFeature -Name Windows-Defender
-    } else {
-        Write-Host "[+] Windows Defender feature appears installed or unavailable."
-    }
-
-    $defenderGui = Get-WindowsFeature -Name Windows-Defender-GUI -ErrorAction SilentlyContinue
-    if ($defenderGui -and -not $defenderGui.Installed) {
-        Write-Host "[+] Installing Windows Defender GUI..."
-        Install-WindowsFeature -Name Windows-Defender-GUI
+    foreach ($feature in 'Windows-Defender','Windows-Defender-GUI') {
+        $f = Get-WindowsFeature -Name $feature -ErrorAction SilentlyContinue
+        if ($f -and -not $f.Installed) {
+            Write-Host "[+] Installing $feature..."
+            Install-WindowsFeature -Name $feature
+        }
     }
 } else {
-    Write-Host "[*] Install-WindowsFeature not available. Skipping Defender feature install."
+    Write-Host "[*] Not a Server SKU (or feature cmdlets unavailable). Skipping feature install."
 }
 
 Write-Host "`n[+] Starting Defender services..."
 Start-Service WinDefend -ErrorAction SilentlyContinue
-Start-Service WdNisSvc -ErrorAction SilentlyContinue
+Start-Service WdNisSvc  -ErrorAction SilentlyContinue
 
-Write-Host "`n[+] Enabling Defender real-time protections..."
+Write-Host "`n[+] Enabling real-time protection..."
 try {
     Set-MpPreference -DisableRealtimeMonitoring $false
     Set-MpPreference -DisableIOAVProtection $false
 } catch {
-    Write-Host "[!] Failed to set Defender preferences. Tamper Protection or policy may be blocking this."
-    Write-Host $_
+    Write-Host "[!] Could not set Defender preferences — Tamper Protection or policy may be blocking."
+    Write-Host "    $($_.Exception.Message)"
 }
 
-Write-Host "`n[+] Attempting Defender policy registry remediation..."
-
+Write-Host "`n[+] Remediating Defender policy registry keys..."
 try {
-    $defenderPolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
-    $rtPolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection"
-
-    New-Item -Path $defenderPolicyPath -Force | Out-Null
-    New-Item -Path $rtPolicyPath -Force | Out-Null
-
-    New-ItemProperty -Path $rtPolicyPath -Name "DisableBehaviorMonitoring" -Value 0 -PropertyType DWORD -Force | Out-Null
-    New-ItemProperty -Path $rtPolicyPath -Name "DisableOnAccessProtection" -Value 0 -PropertyType DWORD -Force | Out-Null
-    New-ItemProperty -Path $rtPolicyPath -Name "DisableScanOnRealtimeEnable" -Value 0 -PropertyType DWORD -Force | Out-Null
-    New-ItemProperty -Path $defenderPolicyPath -Name "DisableAntiSpyware" -Value 0 -PropertyType DWORD -Force | Out-Null
-
-    Write-Host "[+] Defender policy registry remediation completed."
-}
-catch {
-    Write-Host "[!] Could not modify Defender policy registry keys."
-    Write-Host "[!] This can happen even as Administrator if Tamper Protection, Group Policy, or security policy blocks changes."
+    $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender'
+    $rt = "$policy\Real-Time Protection"
+    New-Item -Path $policy -Force | Out-Null
+    New-Item -Path $rt     -Force | Out-Null
+    New-ItemProperty -Path $rt     -Name DisableBehaviorMonitoring   -Value 0 -PropertyType DWORD -Force | Out-Null
+    New-ItemProperty -Path $rt     -Name DisableOnAccessProtection   -Value 0 -PropertyType DWORD -Force | Out-Null
+    New-ItemProperty -Path $rt     -Name DisableScanOnRealtimeEnable -Value 0 -PropertyType DWORD -Force | Out-Null
+    New-ItemProperty -Path $policy -Name DisableAntiSpyware          -Value 0 -PropertyType DWORD -Force | Out-Null
+    Write-Host "[+] Policy remediation complete."
+} catch {
+    Write-Host "[!] Could not modify policy keys (Tamper Protection / GPO may block this even as admin)."
+    Write-Host "    $($_.Exception.Message)"
 }
 
 Write-Host "`n[+] Restarting Defender services..."
-Start-Service WinDefend -ErrorAction SilentlyContinue
-Start-Service WdNisSvc -ErrorAction SilentlyContinue
+Restart-Service WinDefend -ErrorAction SilentlyContinue
+Start-Service   WdNisSvc  -ErrorAction SilentlyContinue
 
-Write-Host "`n[+] Final Defender Status"
-Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, IsTamperProtected, AMRunningMode, AntivirusSignatureLastUpdated
+Write-Host "`n[+] Final Defender status:"
+Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled,
+    IsTamperProtected, AMRunningMode, AntivirusSignatureLastUpdated
 
-Write-Host "`n[+] Final Firewall Status"
+Write-Host "`n[+] Final firewall status:"
 Get-NetFirewallProfile | Select-Object Name, Enabled
+
+Stop-Transcript | Out-Null
+Write-Host "`n[+] Audit log: $log"
