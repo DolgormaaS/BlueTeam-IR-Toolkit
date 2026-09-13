@@ -3,7 +3,7 @@
 <#
 .SYNOPSIS
     Defender / firewall hardening + policy-tamper remediation.
-    Mutates security state, so every run is captured to a transcript.
+    Mutates security state, so every run is captured to a transcript. 
 #>
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
