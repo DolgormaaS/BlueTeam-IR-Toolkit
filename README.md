@@ -26,7 +26,6 @@ Captures a point-in-time snapshot of the system and writes it to a single, secti
 - **Network:** established TCP connections, resolved to the owning process
 - **Local accounts:** enabled state, last logon, password-set time, SID
 - **Scheduled tasks:** non-disabled tasks and their actions (a common persistence mechanism)
-- **Run-key persistence:** `Run` / `RunOnce` under both HKLM and HKCU
 - **Security events (last 24h):** logon activity parsed field-by-field from the event XML
 
 **Security event coverage:**
