@@ -102,4 +102,4 @@ Confirm with `Y` when prompted.
 
 ## Author
 
-Created by Dolgormaa Sansarsasikhan as part of my cybersecurity scripting practice and hands-on learning journey.
+Created by Dolgormaa Sansarsaikhan as part of my cybersecurity scripting practice and hands-on learning journey.
