@@ -3,7 +3,7 @@
 <#
 .SYNOPSIS
     Rapid Windows triage collector. Snapshots host state to timestamped CSVs
-    for first-response IR / threat hunting. Run elevated.
+    for first-response IR . Run elevated.
 #>
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -19,7 +19,7 @@ function Write-Section {
 }
 
 # pull EventData fields out of an event's XML BY NAME (not position) -> survives schema
-# differences across event IDs. This is what makes the resume bullet literally true.
+# differences across event IDs.
 function Get-EventDataMap {
     param($Event)
     $map = @{}
@@ -46,7 +46,7 @@ function Get-LogonTypeName {
 }
 
 # --- report header ---
-"Windows Triage Report"        | Out-File $out          # overwrite: fresh file each run
+"Windows Triage Report"        | Out-File $out
 "Generated: $(Get-Date)"       | Out-File $out -Append
 "Host: $env:COMPUTERNAME"      | Out-File $out -Append
 
@@ -55,7 +55,7 @@ Write-Host "[+] Checking for running processes..."
 Write-Section "RUNNING PROCESSES" (
     Get-Process |
         Select-Object Name, Id, CPU,
-            @{ N='Path'; E={ try { $_.Path } catch { 'ACCESS_DENIED' } } } |  # protected procs throw
+            @{ N='Path'; E={ try { $_.Path } catch { 'ACCESS_DENIED' } } } |
         Sort-Object CPU -Descending
 )
 
@@ -90,11 +90,11 @@ Write-Section "SCHEDULED TASKS" (
 # --- security events (last 24h) ---
 Write-Host "[+] Checking security events (last 24h)..."
 $ids = 4624, 4625, 4634, 4647, 4720
-$events = Get-WinEvent -FilterHashtable @{      # filter LEFT at the provider, time-bounded
+$events = Get-WinEvent -FilterHashtable @{
     LogName   = 'Security'
     Id        = $ids
     StartTime = (Get-Date).AddDays(-1)
-} -ErrorAction SilentlyContinue                 # no matches = non-terminating error; swallow
+} -ErrorAction SilentlyContinue
 
 $parsed = foreach ($e in $events) {
     $d = Get-EventDataMap -Event $e
